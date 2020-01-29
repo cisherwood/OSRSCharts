@@ -19,5 +19,7 @@ namespace OSRSCharts.Models
         public bool ItemTradeable { get; set; }
         public int? ItemHighalch { get; set; }
         public int? ItemBuyLimit { get; set; }
+
+        public List<Price> Prices { get; set; }
     }
 }

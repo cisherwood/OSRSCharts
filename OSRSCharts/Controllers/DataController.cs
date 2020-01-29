@@ -10,6 +10,7 @@ using System.IO;
 using CsvHelper;
 using OSRSCharts.Data;
 using OSRSCharts.Models;
+using System.Net.Http;
 
 namespace OSRSCharts.Controllers
 {
@@ -64,6 +65,52 @@ namespace OSRSCharts.Controllers
 
         }
 
+        public async Task<IActionResult> UpdatePrice()
+        {
+            // Get all tradeable items
+            List<Item> items = _context.Item.Where(x=>x.ItemTradeable == true).ToList();
+
+            string url;
+            string json;
+
+            foreach(Item i in items)
+            {
+                // list of prices for item
+                List<Price> prices = new List<Price>();
+
+                try
+                {
+                    using (HttpClient client = new HttpClient())
+                    {
+                        url = "http://services.runescape.com/m=itemdb_oldschool/api/graph/" + i.ItemID + ".json";
+                        json = await client.GetStringAsync(url);
+
+                        Price price = JsonConvert.DeserializeObject<Price>(json);
+
+                        foreach(var averagePrice in price.Average)
+                        {
+
+                        }
+
+                        foreach(var dailyPrice in price.Daily)
+                        {
+
+                        }
+
+
+                    }
+                }
+                catch
+                {
+
+                }
+
+            }
+
+            return View();
+        }
+
+
         public class item
         {
             // itemID,itemName,itemMembers,itemTradeable,itemHighalch,itemBuyLimit
@@ -75,6 +122,18 @@ namespace OSRSCharts.Controllers
             public int? itemBuyLimit { get; set; }
 
         }
+
+
+        public partial class Price
+        {
+            [JsonProperty("daily")]
+            public Dictionary<string, long> Daily { get; set; }
+
+            [JsonProperty("average")]
+            public Dictionary<string, long> Average { get; set; }
+        }
+
+
     }
 
 
