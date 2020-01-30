@@ -70,7 +70,7 @@ namespace OSRSCharts.Controllers
         public async Task<IActionResult> UpdatePrice()
         {
             // Get all tradeable items
-            List<Item> items = _context.Item.Where(x=>x.ItemTradeable == true).ToList();
+            List<Item> items = _context.Item.Where(x=>x.ItemTradeable == true).Where(x=>x.ItemBuyLimit != null).ToList();
             List<Price> existingPrices = _context.Price.ToList();
 
             string url; // OSRS GE API url
@@ -78,51 +78,63 @@ namespace OSRSCharts.Controllers
 
             foreach(Item i in items) // Loop through all items
             {
-                Thread.Sleep(500);
 
                 // list of prices for item
                 List<Price> prices = new List<Price>();
                 int itemid = items.Where(x => x.ItemID == i.ItemID).FirstOrDefault().ID; // get database item ID from OSRS item id
 
-                try
+                int c = 1; // counter variable - how many times to try to reach OSRS GE API?
+
+                while (c <= 3) // countiue to attempt to query API until 3 attempts have been reached
                 {
-                    using (HttpClient client = new HttpClient())
+
+                    try
                     {
-                        
-
-                        url = "http://services.runescape.com/m=itemdb_oldschool/api/graph/" + i.ItemID + ".json"; // Create url
-                        json = await client.GetStringAsync(url); // Get JSON data
-
-                        PriceConvert price = JsonConvert.DeserializeObject<PriceConvert>(json); // Deserialize json data to C# object
-
-                        foreach(var averagePrice in price.Average) // Loop through each average price 
+                        using (HttpClient client = new HttpClient())
                         {
-                            Price p = new Price(); // Create new price object
 
-                            p.ItemID = itemid; // Set price object item ID to database value of item id
-                            p.AveragePrice = Convert.ToInt32(averagePrice.Value); // convert price (long) to int
-                            p.Time = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(averagePrice.Key)).UtcDateTime; // convert epoch (unix) time to UTC
 
-                            prices.Add(p); // Add price to list of prices
+                            url = "http://services.runescape.com/m=itemdb_oldschool/api/graph/" + i.ItemID + ".json"; // Create url
+                            json = await client.GetStringAsync(url); // Get JSON data
+
+                            PriceConvert price = JsonConvert.DeserializeObject<PriceConvert>(json); // Deserialize json data to C# object
+
+                            foreach (var averagePrice in price.Average) // Loop through each average price 
+                            {
+                                Price p = new Price(); // Create new price object
+
+                                p.ItemID = itemid; // Set price object item ID to database value of item id
+                                p.AveragePrice = Convert.ToInt32(averagePrice.Value); // convert price (long) to int
+                                p.Time = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(averagePrice.Key)).UtcDateTime; // convert epoch (unix) time to UTC
+
+                                prices.Add(p); // Add price to list of prices
+                            }
+
+
+                            foreach (var dailyPrice in price.Daily) // Loop through all daily key / values
+                            {
+                                DateTime dailyTime = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(dailyPrice.Key)).UtcDateTime; // conver epoch (unix) time to UTC
+
+                                prices.Where(x => x.ItemID == itemid).Where(x => x.Time == dailyTime).FirstOrDefault().DailyPrice = Convert.ToInt32(dailyPrice.Value); // Select average price entry, and add daily price value to it
+                            }
+
+
                         }
 
-
-                        foreach(var dailyPrice in price.Daily) // Loop through all daily key / values
-                        {
-                            DateTime dailyTime = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(dailyPrice.Key)).UtcDateTime; // conver epoch (unix) time to UTC
-
-                            prices.Where(x => x.ItemID == itemid).Where(x => x.Time == dailyTime).FirstOrDefault().DailyPrice = Convert.ToInt32(dailyPrice.Value); // Select average price entry, and add daily price value to it
-                        }
-
+                        c = 4; // set counter above # of tries threshold (sucssesfull API query, move on
 
                     }
-                }
-                catch(Exception e)
-                {
+                    catch (Exception e)
+                    {
+                        Thread.Sleep(500); // unable to reach GE API - wait
+                        c++; // increment counter variable
+                    }
 
-                }
+                } 
 
-                foreach(Price p in prices) // Loop through all days for this item
+
+
+                foreach (Price p in prices) // Loop through all days for this item
                 {
                     // TODO - check it item price data exists
                     if(existingPrices.Where(x=>x.ItemID == i.ID).Where(x=>x.Time == p.Time).Any())
