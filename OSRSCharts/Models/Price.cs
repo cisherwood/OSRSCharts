@@ -19,8 +19,8 @@ namespace OSRSCharts.Models
 
 
 
-        public int DailyPrice { get; set; }
-        public int AveragePrice { get; set; }
+        public int? DailyPrice { get; set; }
+        public int? AveragePrice { get; set; }
 
         public Item Item { get; set; }
 
