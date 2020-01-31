@@ -78,6 +78,7 @@ namespace OSRSCharts.Controllers
 
             foreach(Item i in items) // Loop through all items
             {
+                Thread.Sleep(1000);
 
                 // list of prices for item
                 List<Price> prices = new List<Price>();
@@ -126,7 +127,7 @@ namespace OSRSCharts.Controllers
                     }
                     catch (Exception e)
                     {
-                        Thread.Sleep(500); // unable to reach GE API - wait
+                        Thread.Sleep(2000); // unable to reach GE API - wait
                         c++; // increment counter variable
                     }
 
