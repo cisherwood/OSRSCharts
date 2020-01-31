@@ -16,6 +16,7 @@ namespace OSRSCharts.Data
 
         public DbSet<Item> Item { get; set; }
         public DbSet<Price> Price { get; set; }
+        public DbSet<TradeVolume> TradeVolume { get; set; }
 
     }
 }

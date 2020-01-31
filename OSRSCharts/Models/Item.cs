@@ -21,5 +21,7 @@ namespace OSRSCharts.Models
         public int? ItemBuyLimit { get; set; }
 
         public List<Price> Prices { get; set; }
+        public List<TradeVolume> TradeVolume { get; set; }
+
     }
 }

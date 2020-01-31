@@ -12,6 +12,7 @@ using OSRSCharts.Data;
 using OSRSCharts.Models;
 using System.Net.Http;
 using System.Threading;
+using HtmlAgilityPack;
 
 namespace OSRSCharts.Controllers
 {
@@ -157,6 +158,111 @@ namespace OSRSCharts.Controllers
             return View();
         }
 
+        public IActionResult UpdateTradeVolume()
+        {
+            // Get all tradeable items
+            // TODO - Get items with price history data
+            List<Item> items = _context.Item.Where(x => x.ItemTradeable == true).Where(x => x.ItemBuyLimit != null).ToList();
+            List<TradeVolume> existingTrades = _context.TradeVolume.ToList();
+
+            string url; // OSRS GE  url
+            var web = new HtmlWeb(); // website data object
+
+            foreach(Item i in items)
+            {
+                List<TradeVolume> tradeVolumes = new List<TradeVolume>();
+                string itemID = i.ItemID.ToString(); // Get itemID (OSRS ID)
+                string itemName = i.ItemName.Replace(" ", "+"); // format item name to url compatible item name
+
+                int c = 1; // counter variable - how many times to try to reach OSRS GE website?
+
+                while (c <= 3) // countiue to attempt to query GE website until 3 attempts have been reached
+                {
+                    try
+                    {
+
+                        url = "http://services.runescape.com/m=itemdb_oldschool/" + itemName + "/viewitem?obj=" + itemID; // create GE URL
+
+                        var doc = web.Load(url); // Load web data
+
+                        var scriptNode = doc.DocumentNode.SelectSingleNode("/html/body/div/div/main/div[2]/script"); // Select script node with trade data values
+                        string tradeVolumeText = scriptNode.InnerText; // Get text from within script node
+
+                        using (StringReader reader = new StringReader(tradeVolumeText)) // string reader to loop through text lines
+                        {
+                            string line = string.Empty; // Create empty string that contains text of each line
+                            do
+                            {
+                                line = reader.ReadLine();
+                                if (line != null)
+                                {
+                                    if (line.Contains("trade180") && !line.Contains("[['Date','Daily','Average']]"))
+                                    {
+                                        line = line.Replace("\t", string.Empty);
+
+                                        // Get date from string
+                                        int volumeDateStartPos = line.LastIndexOf("Date('") + 6; // "6" removes "Date('"
+                                        int volumeDateLength = line.IndexOf("'),") - volumeDateStartPos;
+                                        string volumeDate = line.Substring(volumeDateStartPos, volumeDateLength);
+
+                                        // Get trade volume amount from string
+                                        int volumeAmountStartPos = line.LastIndexOf("'), ") + 4; // "4" removes "'), "
+                                        int volumeAmountLength = line.IndexOf("]);") - volumeAmountStartPos;
+                                        string volumeAmount = line.Substring(volumeAmountStartPos, volumeAmountLength);
+
+                                        // Parse data into trade volume object
+                                        TradeVolume tradeVolume = new TradeVolume();
+                                        tradeVolume.ItemID = i.ID;
+                                        tradeVolume.Time = Convert.ToDateTime(volumeDate);
+                                        tradeVolume.NumberOfTrades = Convert.ToInt32(volumeAmount);
+
+                                        tradeVolumes.Add(tradeVolume);
+                                    }
+                                }
+
+                            }
+                            while (line != null);
+                        }
+
+                        c = 4; // Set counter above threshold - succsessful GE query!
+
+                    }
+                    catch
+                    {
+                        Thread.Sleep(2000); // unable to reach GE website - wait
+                        c++; // increment counter variable
+                    }
+
+                }
+
+
+
+                // Add each trade record to database
+                foreach(TradeVolume trade in tradeVolumes)
+                {
+
+                    // TODO - check it item trade data exists
+                    if (existingTrades.Where(x => x.ItemID == i.ID).Where(x => x.Time == trade.Time).Any())
+                    {
+                        // record already exists - do nothing
+                    }
+                    else
+                    {
+                        _context.TradeVolume.Add(trade);
+
+                    }
+
+
+                }
+
+                // Update database
+                _context.SaveChanges();
+            }
+
+
+            //http://services.runescape.com/m=itemdb_oldschool/Ahrim%27s+hood/viewitem?obj=4708
+            return View();
+        } 
 
         public class item
         {
